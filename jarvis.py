@@ -44,8 +44,9 @@ Note:
 - Ensure the `.env` file contains a valid `OPENAI_API_KEY`.
 - Install required dependencies (`langchain`, `speech_recognition`, `pyttsx3`, etc.) before running.
 """
+
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI  # ✅ Correct
+from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain.agents import initialize_agent, Tool
 from langchain_community.tools import DuckDuckGoSearchRun
@@ -61,16 +62,30 @@ if USE_VOICE:
 load_dotenv()
 openai_key = os.getenv("OPENAI_API_KEY")
 
+if not openai_key:
+    raise ValueError("Please set your OPENAI_API_KEY in the .env file")
+
 # Initialize LLM
-llm = ChatOpenAI(model="{correct_model_name}", temperature=0.6)
+llm = ChatOpenAI(
+    model="gpt-4-turbo-preview",  # or "gpt-3.5-turbo" if you don't have GPT-4 access
+    temperature=0.6
+)
 
 # Memory
-memory = ConversationBufferMemory(memory_key="chat_history")
-
+memory = ConversationBufferMemory(
+    memory_key="chat_history",
+    return_messages=True
+)
 
 # Tools
 search = DuckDuckGoSearchRun()
-tools = [Tool(name="Search", func=search.run, description="Search the internet.")]
+tools = [
+    Tool(
+        name="Search",
+        func=search.run,
+        description="Useful for searching the internet for current information."
+    )
+]
 
 # Agent
 agent = initialize_agent(
@@ -78,7 +93,9 @@ agent = initialize_agent(
     llm=llm,
     memory=memory,
     agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
-    verbose=False,
+    verbose=True,  # Set to True to see the agent's thought process
+    max_iterations=3,  # Prevent infinite loops
+    handle_parsing_errors=True
 )
 
 # Voice engines
@@ -87,6 +104,7 @@ if USE_VOICE:
     engine = pyttsx3.init()
 
 def speak(text):
+    """Output text via voice or print"""
     if USE_VOICE:
         engine.say(text)
         engine.runAndWait()
@@ -94,27 +112,46 @@ def speak(text):
         print(f"Jarvis: {text}")
 
 def listen():
+    """Get user input via voice or text"""
     if not USE_VOICE:
         return input("You: ")
+    
     with sr.Microphone() as source:
         print("Listening...")
+        recognizer.adjust_for_ambient_noise(source)
         audio = recognizer.listen(source)
         try:
-            return recognizer.recognize_google(audio)
-        except:
+            text = recognizer.recognize_google(audio)
+            print(f"You: {text}")
+            return text
+        except sr.UnknownValueError:
             return "Sorry, I couldn't understand that."
+        except sr.RequestError:
+            return "Sorry, there was an error with the speech recognition service."
 
-# Run assistant
 def run_jarvis():
-    print("🧠 JARVIS online. Type or speak your commands. Say 'exit' to quit.")
+    """Main assistant loop"""
+    print("🤖 JARVIS online. Type or speak your commands. Say 'exit' or 'quit' to end.")
+    
     while True:
-        user_input = listen()
-        if user_input.lower() in ["exit", "quit"]:
-            speak("Goodbye, sir.")
-            break
-        response = agent.run(user_input)  # ✅ Use run
-        speak(response)
-
+        try:
+            user_input = listen()
+            
+            if user_input.lower() in ["exit", "quit"]:
+                speak("Goodbye! Have a great day.")
+                break
+                
+            if user_input.lower() in ["sorry, i couldn't understand that.", 
+                                    "sorry, there was an error with the speech recognition service."]:
+                speak("Could you please repeat that?")
+                continue
+                
+            response = agent.run(input=user_input)
+            speak(response)
+            
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            speak("I encountered an error. Please try again.")
 
 if __name__ == "__main__":
     run_jarvis()
