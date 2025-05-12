@@ -13,3 +13,4 @@ class LangchainGPTBotModel:
 
     def generate_response(self, chain: LLMChain, user_input: str):
         return chain.run(input=user_input)
+    
