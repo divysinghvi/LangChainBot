@@ -1,7 +1,7 @@
 import openai
 
 # Set API key
-openai.api_key = "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"
+openai.api_key = "Your api key"
 
 # Use new `openai.ChatCompletion.create()` method
 response = openai.ChatCompletion.create(
@@ -10,3 +10,4 @@ response = openai.ChatCompletion.create(
 )
 
 print("✅ Response:", response['choices'][0]['message']['content'])
+g
